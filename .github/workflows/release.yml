@@ -102,6 +102,18 @@ jobs:
           # Wait for deployment to complete
           Start-Sleep -Seconds 5
           
+          # Change database owner to 'sa' (required for signed UNSAFE assemblies to load properly)
+          Write-Host "Setting database owner to sa..."
+          sqlcmd -S $serverInstance -d $dbName -Q "EXEC sp_changedbowner 'sa'"
+          
+          # Test the assembly
+          Write-Host "Testing assembly..."
+          sqlcmd -S $serverInstance -d $dbName -Q "SELECT dbo.EncryptString('test') AS Result"
+          
+          if ($LASTEXITCODE -ne 0) {
+              Write-Warning "Assembly test failed, continuing..."
+          }
+          
           # Export to BACPAC
           Write-Host "Exporting to BACPAC..."
           & $sqlPackage /Action:Export /SourceServerName:$serverInstance /SourceDatabaseName:$dbName /TargetFile:$bacpacPath
@@ -187,6 +199,7 @@ jobs:
             
             **Option 1: Restore from backup (.bak file)**
             ```sql
+            -- Restore database
             RESTORE DATABASE [FastWrappers-TSQL] FROM DISK = 'FastWrappers-TSQL.bak';
             GO
             
@@ -199,10 +212,26 @@ jobs:
             EXEC sp_configure 'clr enabled', 1;
             RECONFIGURE;
             GO
+            
+            -- IMPORTANT: Change database owner to 'sa' 
+            -- Required for signed UNSAFE assemblies to load properly
+            USE [FastWrappers-TSQL];
+            GO
+            EXEC sp_changedbowner 'sa';
+            GO
+            
+            -- Test
+            SELECT dbo.EncryptString('test');
             ```
             
             **Option 2: Deploy DACPAC**
-            Use SqlPackage or Visual Studio to deploy the .dacpac file.
+            Use SqlPackage or Visual Studio to deploy the .dacpac file, then run:
+            ```sql
+            USE [FastWrappers-TSQL];
+            GO
+            EXEC sp_changedbowner 'sa';
+            GO
+            ```
             
             ### Usage
             
