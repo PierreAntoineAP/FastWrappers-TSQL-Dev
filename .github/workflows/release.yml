@@ -38,9 +38,9 @@ jobs:
           # Check for DACPAC in bin\Output (SQL Projects output here)
           $dacpacPath = "bin\Output\FastWrappers_TSQL.dacpac"
           if (Test-Path $dacpacPath) {
-            Write-Host "✓ DACPAC found at: $dacpacPath"
+            Write-Host "DACPAC found at: $dacpacPath"
           } else {
-            Write-Host "✗ DACPAC not found at: $dacpacPath"
+            Write-Host "DACPAC not found at: $dacpacPath"
             Write-Host "Looking for .dacpac files..."
             Get-ChildItem -Path . -Filter "*.dacpac" -Recurse -ErrorAction SilentlyContinue | Format-Table FullName
             exit 1
@@ -159,9 +159,9 @@ jobs:
           foreach ($file in $files) {
               if (Test-Path $file.Source) {
                   Copy-Item $file.Source "release\$($file.Name)" -Force
-                  Write-Host "✓ Copied $($file.Name)"
+                  Write-Host "Copied $($file.Name)"
               } else {
-                  Write-Warning "✗ $($file.Name) not found, skipping"
+                  Write-Warning "$($file.Name) not found, skipping"
               }
           }
           
