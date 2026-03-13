@@ -23,7 +23,28 @@ jobs:
         run: nuget restore FastWrappers-TSQL.sln
       
       - name: Build SQL Project
-        run: msbuild FastWrappers_TSQL.sqlproj /p:Configuration=Release /p:Platform="Any CPU"
+        run: msbuild FastWrappers_TSQL.sqlproj /p:Configuration=Release /p:Platform="Any CPU" /t:Build,Package
+      
+      - name: Verify Build Artifacts
+        shell: powershell
+        run: |
+          Write-Host "Checking for build output..."
+          if (Test-Path "bin") {
+            Get-ChildItem -Path "bin" -Recurse -File | Format-Table FullName, Length
+          } else {
+            Write-Host "bin folder does not exist!"
+          }
+          
+          # Check for DACPAC
+          $dacpacPath = "bin\Release\FastWrappers_TSQL.dacpac"
+          if (Test-Path $dacpacPath) {
+            Write-Host "✓ DACPAC found at: $dacpacPath"
+          } else {
+            Write-Host "✗ DACPAC not found at: $dacpacPath"
+            Write-Host "Looking for .dacpac files..."
+            Get-ChildItem -Path . -Filter "*.dacpac" -Recurse -ErrorAction SilentlyContinue | Format-Table FullName
+            exit 1
+          }
       
       - name: Setup SQL Server (LocalDB)
         shell: powershell
@@ -44,12 +65,26 @@ jobs:
           $dacpacPath = "bin\Release\FastWrappers_TSQL.dacpac"
           $bacpacPath = "bin\Release\FastWrappers-TSQL.bacpac"
           $bakPath = "bin\Release\FastWrappers-TSQL.bak"
+          $generatedSqlPath = "bin\Release\FastWrappers-TSQL.sql"
+          
+          # Ensure output directory exists
+          if (!(Test-Path "bin\Release")) {
+              Write-Host "Creating bin\Release directory..."
+              New-Item -Path "bin\Release" -ItemType Directory -Force | Out-Null
+          }
+          
+          # Verify DACPAC exists
+          if (!(Test-Path $dacpacPath)) {
+              Write-Error "DACPAC not found at: $dacpacPath"
+              exit 1
+          }
           
           # Download SqlPackage if needed
           if (!(Test-Path "SqlPackage\SqlPackage.exe")) {
               Write-Host "Downloading SqlPackage..."
               Invoke-WebRequest -Uri "https://aka.ms/sqlpackage-windows" -OutFile "SqlPackage.zip"
-              Expand-Archive -Path "SqlPackage.zip" -DestinationPath "SqlPackage"
+              Expand-Archive -Path "SqlPackage.zip" -DestinationPath "SqlPackage" -Force
+              Remove-Item "SqlPackage.zip"
           }
           
           $sqlPackage = "SqlPackage\SqlPackage.exe"
@@ -58,6 +93,11 @@ jobs:
           Write-Host "Deploying DACPAC to create database..."
           & $sqlPackage /Action:Publish /SourceFile:$dacpacPath /TargetServerName:$serverInstance /TargetDatabaseName:$dbName /p:IncludeCompositeObjects=True
           
+          if ($LASTEXITCODE -ne 0) {
+              Write-Error "Failed to deploy DACPAC"
+              exit 1
+          }
+          
           # Wait for deployment to complete
           Start-Sleep -Seconds 5
           
@@ -65,25 +105,67 @@ jobs:
           Write-Host "Exporting to BACPAC..."
           & $sqlPackage /Action:Export /SourceServerName:$serverInstance /SourceDatabaseName:$dbName /TargetFile:$bacpacPath
           
+          if ($LASTEXITCODE -ne 0) {
+              Write-Warning "Failed to create BACPAC, continuing..."
+          }
+          
           # Create .bak file with compatibility level for SQL Server 2016
           Write-Host "Creating SQL Server 2016 compatible backup..."
-          sqlcmd -S $serverInstance -Q "ALTER DATABASE [$dbName] SET COMPATIBILITY_LEVEL = 130; BACKUP DATABASE [$dbName] TO DISK = N'$PWD\$bakPath' WITH COMPRESSION, STATS = 10"
+          $bakFullPath = Join-Path $PWD $bakPath
+          sqlcmd -S $serverInstance -Q "ALTER DATABASE [$dbName] SET COMPATIBILITY_LEVEL = 130; BACKUP DATABASE [$dbName] TO DISK = N'$bakFullPath' WITH COMPRESSION, STATS = 10"
+          
+          if ($LASTEXITCODE -ne 0) {
+              Write-Warning "Failed to create BAK file, continuing..."
+          }
           
           # Generate SQL script from DACPAC (includes the compiled binary)
           Write-Host "Generating SQL script from DACPAC..."
-          $generatedSqlPath = "bin\Release\FastWrappers-TSQL.sql"
           & $sqlPackage /Action:Script /SourceFile:$dacpacPath /OutputPath:$generatedSqlPath /p:IncludeCompositeObjects=True
+          
+          if ($LASTEXITCODE -ne 0) {
+              Write-Warning "Failed to generate SQL script, continuing..."
+          }
           
           # Copy DACPAC with proper name
           Write-Host "Copying DACPAC with release name..."
-          Copy-Item $dacpacPath "bin\Release\FastWrappers-TSQL.dacpac"
+          Copy-Item $dacpacPath "bin\Release\FastWrappers-TSQL.dacpac" -Force
           
-          Write-Host "All artifacts created successfully!"
+          # List all created artifacts
+          Write-Host "`nCreated artifacts:"
+          Get-ChildItem -Path "bin\Release" -File | Format-Table Name, Length
+          
+          Write-Host "All artifacts processing completed!"
       
       - name: Get version from tag
         id: get_version
         shell: bash
         run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+      
+      - name: Prepare Release Files
+        shell: powershell
+        run: |
+          # Create a release directory with all available artifacts
+          New-Item -Path "release" -ItemType Directory -Force | Out-Null
+          
+          # Copy available files
+          $files = @(
+              @{Source="bin\Release\FastWrappers-TSQL.dacpac"; Name="FastWrappers-TSQL.dacpac"},
+              @{Source="bin\Release\FastWrappers-TSQL.bacpac"; Name="FastWrappers-TSQL.bacpac"},
+              @{Source="bin\Release\FastWrappers-TSQL.bak"; Name="FastWrappers-TSQL.bak"},
+              @{Source="bin\Release\FastWrappers-TSQL.sql"; Name="FastWrappers-TSQL.sql"}
+          )
+          
+          foreach ($file in $files) {
+              if (Test-Path $file.Source) {
+                  Copy-Item $file.Source "release\$($file.Name)" -Force
+                  Write-Host "✓ Copied $($file.Name)"
+              } else {
+                  Write-Warning "✗ $($file.Name) not found, skipping"
+              }
+          }
+          
+          Write-Host "`nRelease files:"
+          Get-ChildItem -Path "release" | Format-Table Name, Length
       
       - name: Create Release
         id: create_release
@@ -106,10 +188,7 @@ jobs:
             
             See [README.md](https://github.com/${{ github.repository }}/blob/main/README.md) for usage examples.
           files: |
-            bin/Release/FastWrappers-TSQL.dacpac
-            bin/Release/FastWrappers-TSQL.bacpac
-            bin/Release/FastWrappers-TSQL.bak
-            bin/Release/FastWrappers-TSQL.sql
+            release/*
           draft: false
           prerelease: false
         env:
