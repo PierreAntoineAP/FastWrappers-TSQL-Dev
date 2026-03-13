@@ -106,12 +106,20 @@ jobs:
           Write-Host "Setting database owner to sa..."
           sqlcmd -S $serverInstance -d $dbName -Q "EXEC sp_changedbowner 'sa'"
           
+          # Enable CLR for testing
+          Write-Host "Enabling CLR..."
+          sqlcmd -S $serverInstance -Q "EXEC sp_configure 'show advanced options', 1; RECONFIGURE; EXEC sp_configure 'clr enabled', 1; RECONFIGURE;"
+          
           # Test the assembly
           Write-Host "Testing assembly..."
-          sqlcmd -S $serverInstance -d $dbName -Q "SELECT dbo.EncryptString('test') AS Result"
+          $testResult = sqlcmd -S $serverInstance -d $dbName -Q "SELECT dbo.EncryptString('test') AS Result" 2>&1
           
-          if ($LASTEXITCODE -ne 0) {
-              Write-Warning "Assembly test failed, continuing..."
+          if ($LASTEXITCODE -eq 0) {
+              Write-Host "Assembly test successful!"
+              Write-Host $testResult
+          } else {
+              Write-Warning "Assembly test failed: $testResult"
+              Write-Warning "Continuing with artifact creation..."
           }
           
           # Export to BACPAC
@@ -133,7 +141,7 @@ jobs:
           
           # Generate SQL script from DACPAC (includes the compiled binary)
           Write-Host "Generating SQL script from DACPAC..."
-          & $sqlPackage /Action:Script /SourceFile:$dacpacPath /OutputPath:$generatedSqlPath /p:IncludeCompositeObjects=True
+          & $sqlPackage /Action:Script /SourceFile:$dacpacPath /TargetServerName:$serverInstance /TargetDatabaseName:"${dbName}_Script" /OutputPath:$generatedSqlPath /p:IncludeCompositeObjects=True /p:CommentOutSetVarDeclarations=True
           
           if ($LASTEXITCODE -ne 0) {
               Write-Warning "Failed to generate SQL script, continuing..."
