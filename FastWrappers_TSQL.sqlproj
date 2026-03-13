@@ -16,7 +16,7 @@
     <ModelCollation>1033, CI</ModelCollation>
     <DefaultFileStructure>BySchemaAndSchemaType</DefaultFileStructure>
     <DeployToDatabase>True</DeployToDatabase>
-    <TargetFrameworkVersion>v4.8.1</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
     <TargetLanguage>CS</TargetLanguage>
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <SqlServerVerification>False</SqlServerVerification>
@@ -32,7 +32,6 @@
     <AssemblyOriginatorKeyFile>AetPCLRSign.pfx.snk</AssemblyOriginatorKeyFile>
     <GenerateCreateScript>True</GenerateCreateScript>
     <DacDescription>procedures de wrapping pour FastTransfer et FastBCP</DacDescription>
-    <TargetFrameworkProfile />
     <DacVersion>2.0.0.0</DacVersion>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
