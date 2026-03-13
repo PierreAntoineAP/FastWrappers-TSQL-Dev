@@ -25,6 +25,92 @@ jobs:
       - name: Build SQL Project
         run: msbuild FastWrappers_TSQL.sqlproj /p:Configuration=Release /p:Platform="Any CPU" /t:Build
       
+      - name: Create and Sign Assembly Certificate
+        shell: powershell
+        run: |
+          # Create self-signed certificate for SQL CLR assembly signing
+          Write-Host "Creating certificate for assembly signing..."
+          $cert = New-SelfSignedCertificate `
+            -Type CodeSigningCert `
+            -Subject "CN=FastWrappers SQLCLR Assembly" `
+            -KeyExportPolicy Exportable `
+            -CertStoreLocation "Cert:\CurrentUser\My" `
+            -NotAfter (Get-Date).AddYears(10) `
+            -KeyAlgorithm RSA `
+            -KeyLength 2048
+          
+          # Export public certificate for SQL Server
+          $certPath = "bin\Output\FastWrappers-Certificate.cer"
+          Export-Certificate -Cert $cert -FilePath $certPath -Force
+          Write-Host "Certificate exported to: $certPath"
+          
+          # Sign the compiled DLL
+          $dllPath = "bin\Output\FastWrappers_TSQL.dll"
+          if (Test-Path $dllPath) {
+            Write-Host "Signing assembly DLL..."
+            Set-AuthenticodeSignature -FilePath $dllPath -Certificate $cert -TimestampServer "http://timestamp.digicert.com"
+            Write-Host "Assembly signed successfully"
+          } else {
+            Write-Error "DLL not found at: $dllPath"
+            exit 1
+          }
+          
+          # Get certificate thumbprint for documentation
+          $thumbprint = $cert.Thumbprint
+          Write-Host "Certificate Thumbprint: $thumbprint"
+      
+      - name: Generate Certificate Installation Script
+        shell: powershell
+        run: |
+          $installScript = @"
+          -- =============================================
+          -- FastWrappers-TSQL Certificate Installation
+          -- =============================================
+          -- This script must be run ONCE on each SQL Server instance
+          -- before deploying FastWrappers-TSQL databases.
+          --
+          -- Prerequisites:
+          --   1. Place FastWrappers-Certificate.cer in an accessible location
+          --   2. Update the file path below to match your certificate location
+          --   3. Run this script as sysadmin
+          -- =============================================
+          
+          USE master;
+          GO
+          
+          -- Clean up existing certificate and login (if re-installing)
+          IF EXISTS (SELECT * FROM sys.server_principals WHERE name = 'FastWrappersLogin')
+              DROP LOGIN FastWrappersLogin;
+          GO
+          
+          IF EXISTS (SELECT * FROM sys.certificates WHERE name = 'FastWrappersCert')
+              DROP CERTIFICATE FastWrappersCert;
+          GO
+          
+          -- Create certificate from the .cer file
+          -- IMPORTANT: Update the path to where you placed the certificate file
+          CREATE CERTIFICATE FastWrappersCert
+          FROM FILE = 'C:\Path\To\FastWrappers-Certificate.cer';
+          GO
+          
+          -- Create login from certificate
+          CREATE LOGIN FastWrappersLogin
+          FROM CERTIFICATE FastWrappersCert;
+          GO
+          
+          -- Grant UNSAFE ASSEMBLY permission to the login
+          GRANT UNSAFE ASSEMBLY TO FastWrappersLogin;
+          GO
+          
+          -- Verification
+          PRINT 'Certificate and login created successfully!';
+          PRINT 'You can now deploy FastWrappers-TSQL databases without TRUSTWORTHY ON.';
+          GO
+          "@
+          
+          $installScript | Out-File -FilePath "bin\Output\Install-Certificate.sql" -Encoding UTF8
+          Write-Host "Certificate installation script created"
+      
       - name: Verify Build Artifacts
         shell: powershell
         run: |
@@ -153,7 +239,9 @@ jobs:
               @{Source="bin\Release\FastWrappers-TSQL.dacpac"; Name="FastWrappers-TSQL.dacpac"},
               @{Source="bin\Release\FastWrappers-TSQL.bacpac"; Name="FastWrappers-TSQL.bacpac"},
               @{Source="bin\Release\FastWrappers-TSQL.bak"; Name="FastWrappers-TSQL.bak"},
-              @{Source="bin\Release\FastWrappers-TSQL.sql"; Name="FastWrappers-TSQL.sql"}
+              @{Source="bin\Release\FastWrappers-TSQL.sql"; Name="FastWrappers-TSQL.sql"},
+              @{Source="bin\Output\FastWrappers-Certificate.cer"; Name="FastWrappers-Certificate.cer"},
+              @{Source="bin\Output\Install-Certificate.sql"; Name="Install-Certificate.sql"}
           )
           
           foreach ($file in $files) {
@@ -176,14 +264,47 @@ jobs:
           body: |
             ## FastWrappers-TSQL v${{ steps.get_version.outputs.VERSION }}
             
-            ### Installation Methods
+            ### 🔒 Security Notice - Certificate-Based Installation (No TRUSTWORTHY Required!)
             
-            This release provides multiple installation options:
+            This release includes a **signed assembly** that eliminates the need for `TRUSTWORTHY ON`.
+            
+            #### One-Time Server Setup (Required Before First Use)
+            
+            1. Download `FastWrappers-Certificate.cer` and `Install-Certificate.sql`
+            2. Place the certificate file in an accessible location (e.g., `C:\Certificates\`)
+            3. Edit `Install-Certificate.sql` and update the certificate file path
+            4. Run `Install-Certificate.sql` as **sysadmin** on your SQL Server instance
+            
+            **This setup is done ONCE per SQL Server instance.**
+            
+            #### After Certificate Installation
+            
+            You can then deploy FastWrappers-TSQL using any method below **WITHOUT** `TRUSTWORTHY ON`:
+            
+            ---
+            
+            ### 📦 Installation Methods
             
             - **FastWrappers-TSQL.dacpac** - Data-tier Application Package (recommended for Visual Studio / SQL Server Data Tools)
             - **FastWrappers-TSQL.bacpac** - Binary Application Package (for import/export between servers)
             - **FastWrappers-TSQL.bak** - SQL Server Backup (compatible with SQL Server 2016+, restore using SSMS)
             - **FastWrappers-TSQL.sql** - Pure SQL Script (execute using sqlcmd or SSMS)
+            
+            ### 🔐 Security Files
+            
+            - **FastWrappers-Certificate.cer** - Public certificate for SQL Server (required for installation)
+            - **Install-Certificate.sql** - Installation script for certificate setup
+            
+            ### ⚙️ Server Configuration
+            
+            Once the certificate is installed, you still need to enable CLR:
+            
+            ```sql
+            EXEC sp_configure 'show advanced options', 1;
+            RECONFIGURE;
+            EXEC sp_configure 'clr enabled', 1;
+            RECONFIGURE;
+            ```
             
             ### Usage
             
