@@ -110,18 +110,18 @@ jobs:
               Write-Warning "Failed to create BACPAC, continuing..."
           }
           
-          # Create .bak file with compatibility level for SQL Server 2016
+          # Create .bak file with compatibility level for SQL Server 2016 (without compression for Express)
           Write-Host "Creating SQL Server 2016 compatible backup..."
           $bakFullPath = Join-Path $PWD $bakPath
-          sqlcmd -S $serverInstance -Q "ALTER DATABASE [$dbName] SET COMPATIBILITY_LEVEL = 130; BACKUP DATABASE [$dbName] TO DISK = N'$bakFullPath' WITH COMPRESSION, STATS = 10"
+          sqlcmd -S $serverInstance -Q "ALTER DATABASE [$dbName] SET COMPATIBILITY_LEVEL = 130; BACKUP DATABASE [$dbName] TO DISK = N'$bakFullPath' WITH STATS = 10"
           
           if ($LASTEXITCODE -ne 0) {
               Write-Warning "Failed to create BAK file, continuing..."
           }
           
-          # Generate SQL script from DACPAC (includes the compiled binary)
+          # Generate SQL deployment script from DACPAC
           Write-Host "Generating SQL script from DACPAC..."
-          & $sqlPackage /Action:Script /SourceFile:$dacpacPath /OutputPath:$generatedSqlPath /p:IncludeCompositeObjects=True
+          & $sqlPackage /Action:Script /SourceFile:$dacpacPath /TargetServerName:$serverInstance /TargetDatabaseName:"${dbName}_Script" /OutputPath:$generatedSqlPath /p:IncludeCompositeObjects=True /p:CommentOutSetVarDeclarations=True
           
           if ($LASTEXITCODE -ne 0) {
               Write-Warning "Failed to generate SQL script, continuing..."
