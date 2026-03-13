@@ -90,6 +90,24 @@ jobs:
           
           $sqlPackage = "SqlPackage\SqlPackage.exe"
           
+          # Calculate SHA2-512 hash of the DLL for trusted assembly
+          $dllPath = "bin\Output\FastWrappers_TSQL.dll"
+          Write-Host "Calculating SHA2-512 hash for trusted assembly..."
+          $dllBytes = [System.IO.File]::ReadAllBytes((Resolve-Path $dllPath).Path)
+          $sha512 = [System.Security.Cryptography.SHA512]::Create()
+          $hashBytes = $sha512.ComputeHash($dllBytes)
+          $hashHex = [System.BitConverter]::ToString($hashBytes).Replace("-", "")
+          Write-Host "DLL Hash: 0x$hashHex"
+          
+          # Add assembly as trusted before deployment (for SQL Server 2017+ with clr strict security)
+          Write-Host "Adding assembly as trusted..."
+          $addTrustedAssembly = @"
+EXEC sys.sp_add_trusted_assembly 
+    @hash = 0x$hashHex,
+    @description = N'FastWrappers_TSQL - CLR Wrapper for FastTransfer and FastBCP';
+"@
+          sqlcmd -S $serverInstance -Q $addTrustedAssembly
+          
           # Deploy the DACPAC to create the database
           Write-Host "Deploying DACPAC to create database..."
           & $sqlPackage /Action:Publish /SourceFile:$dacpacPath /TargetServerName:$serverInstance /TargetDatabaseName:$dbName /p:IncludeCompositeObjects=True
@@ -119,9 +137,74 @@ jobs:
               Write-Warning "Failed to create BAK file, continuing..."
           }
           
-          # Generate SQL deployment script from DACPAC
+          # Generate installation script with trusted assembly setup
+          Write-Host "Generating installation script with trusted assembly..."
+          $installScriptPath = "$outputDir\Install-TrustedAssembly.sql"
+          $installScript = @"
+-- =============================================
+-- FastWrappers-TSQL Installation Script
+-- For SQL Server 2017+ with CLR Strict Security
+-- =============================================
+-- This script must be run as sysadmin
+-- =============================================
+
+USE master;
+GO
+
+-- Check SQL Server version and clr strict security
+DECLARE @version INT = CAST(SERVERPROPERTY('ProductMajorVersion') AS INT);
+DECLARE @strictSec INT;
+
+EXEC sp_configure 'show advanced options', 1;
+RECONFIGURE;
+
+SELECT @strictSec = CAST(value_in_use AS INT) 
+FROM sys.configurations 
+WHERE name = 'clr strict security';
+
+PRINT 'SQL Server Version: ' + CAST(@version AS VARCHAR);
+PRINT 'CLR Strict Security: ' + CAST(@strictSec AS VARCHAR);
+
+-- Enable CLR
+EXEC sp_configure 'clr enabled', 1;
+RECONFIGURE;
+GO
+
+-- Add FastWrappers_TSQL as trusted assembly (SQL Server 2017+)
+-- This allows the assembly to load even with clr strict security enabled
+IF NOT EXISTS (SELECT 1 FROM sys.trusted_assemblies WHERE [hash] = 0x$hashHex)
+BEGIN
+    EXEC sys.sp_add_trusted_assembly 
+        @hash = 0x$hashHex,
+        @description = N'FastWrappers_TSQL, Version=0.5.1.0, Culture=neutral, PublicKeyToken=53f6bd85035abe03';
+    PRINT 'Added FastWrappers_TSQL as trusted assembly';
+END
+ELSE
+BEGIN
+    PRINT 'FastWrappers_TSQL already in trusted assemblies';
+END
+GO
+
+-- Now restore the database or deploy DACPAC
+-- Example for backup restore:
+-- RESTORE DATABASE [FastWrappers-TSQL] FROM DISK = 'FastWrappers-TSQL.bak';
+-- GO
+
+-- Set TRUSTWORTHY ON (still required for UNSAFE assemblies)
+-- ALTER DATABASE [FastWrappers-TSQL] SET TRUSTWORTHY ON;
+-- GO
+
+-- Test
+-- USE [FastWrappers-TSQL];
+-- SELECT dbo.EncryptString('test');
+"@
+          
+          $installScript | Out-File -FilePath $installScriptPath -Encoding UTF8
+          Write-Host "Installation script created: $installScriptPath"
+          
+          # Generate SQL script from DACPAC (includes the compiled binary)
           Write-Host "Generating SQL script from DACPAC..."
-          & $sqlPackage /Action:Script /SourceFile:$dacpacPath /TargetServerName:$serverInstance /TargetDatabaseName:"${dbName}_Script" /OutputPath:$generatedSqlPath /p:IncludeCompositeObjects=True /p:CommentOutSetVarDeclarations=True
+          & $sqlPackage /Action:Script /SourceFile:$dacpacPath /OutputPath:$generatedSqlPath /p:IncludeCompositeObjects=True
           
           if ($LASTEXITCODE -ne 0) {
               Write-Warning "Failed to generate SQL script, continuing..."
@@ -153,7 +236,8 @@ jobs:
               @{Source="bin\Release\FastWrappers-TSQL.dacpac"; Name="FastWrappers-TSQL.dacpac"},
               @{Source="bin\Release\FastWrappers-TSQL.bacpac"; Name="FastWrappers-TSQL.bacpac"},
               @{Source="bin\Release\FastWrappers-TSQL.bak"; Name="FastWrappers-TSQL.bak"},
-              @{Source="bin\Release\FastWrappers-TSQL.sql"; Name="FastWrappers-TSQL.sql"}
+              @{Source="bin\Release\FastWrappers-TSQL.sql"; Name="FastWrappers-TSQL.sql"},
+              @{Source="bin\Release\Install-TrustedAssembly.sql"; Name="Install-TrustedAssembly.sql"}
           )
           
           foreach ($file in $files) {
@@ -176,37 +260,65 @@ jobs:
           body: |
             ## FastWrappers-TSQL v${{ steps.get_version.outputs.VERSION }}
             
-            ### Installation Files
+            ### 📦 Installation Files
             
+            - **Install-TrustedAssembly.sql** - ⭐ **REQUIRED FIRST** for SQL Server 2017+ (adds assembly to trusted list)
             - **FastWrappers-TSQL.dacpac** - Data-tier Application Package (for Visual Studio / SQL Server Data Tools)
             - **FastWrappers-TSQL.bacpac** - Binary Application Package (for import/export between servers)
-            - **FastWrappers-TSQL.bak** - SQL Server Backup (restore using SSMS)
+            - **FastWrappers-TSQL.bak** - SQL Server Backup (compatible with SQL Server 2016+, restore using SSMS)
             - **FastWrappers-TSQL.sql** - SQL Script (execute using sqlcmd or SSMS)
             
-            ### Installation
+            ### 🚀 Installation Instructions
             
-            **Option 1: Restore from backup (.bak file)**
+            #### For SQL Server 2017+ (with CLR Strict Security)
+            
+            **Step 1: Run Install-TrustedAssembly.sql first** (as sysadmin)
+            ```sql
+            -- This adds the assembly to sys.trusted_assemblies
+            -- Run this once per SQL Server instance
+            sqlcmd -S YourServer -E -i Install-TrustedAssembly.sql
+            ```
+            
+            **Step 2: Restore database**
             ```sql
             RESTORE DATABASE [FastWrappers-TSQL] FROM DISK = 'FastWrappers-TSQL.bak';
             GO
             
-            -- Enable TRUSTWORTHY and CLR
             ALTER DATABASE [FastWrappers-TSQL] SET TRUSTWORTHY ON;
-            GO
-            
-            EXEC sp_configure 'show advanced options', 1;
-            RECONFIGURE;
-            EXEC sp_configure 'clr enabled', 1;
-            RECONFIGURE;
             GO
             ```
             
-            **Option 2: Deploy DACPAC**
-            Use SqlPackage or Visual Studio to deploy the .dacpac file.
+            **Step 3: Test**
+            ```sql
+            USE [FastWrappers-TSQL];
+            SELECT dbo.EncryptString('test');
+            ```
             
-            ### Usage
+            #### For SQL Server 2016 or with CLR Strict Security disabled
             
-            See [README.md](https://github.com/${{ github.repository }}/blob/main/README.md) for examples.
+            ```sql
+            -- Enable CLR
+            EXEC sp_configure 'show advanced options', 1; RECONFIGURE;
+            EXEC sp_configure 'clr enabled', 1; RECONFIGURE;
+            GO
+            
+            -- Restore database
+            RESTORE DATABASE [FastWrappers-TSQL] FROM DISK = 'FastWrappers-TSQL.bak';
+            GO
+            
+            ALTER DATABASE [FastWrappers-TSQL] SET TRUSTWORTHY ON;
+            GO
+            ```
+            
+            ### 📖 Documentation
+            
+            See [README.md](https://github.com/${{ github.repository }}/blob/main/README.md) for usage examples.
+            
+            ### ⚠️ Important Notes
+            
+            - SQL Server 2017+ requires running **Install-TrustedAssembly.sql** first due to CLR strict security
+            - The assembly is signed and requires UNSAFE permission set
+            - TRUSTWORTHY ON is required for proper operation
           files: |
             release/*
           draft: false
