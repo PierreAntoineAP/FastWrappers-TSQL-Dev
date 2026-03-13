@@ -23,7 +23,7 @@ jobs:
         run: nuget restore FastWrappers-TSQL.sln
       
       - name: Build SQL Project
-        run: msbuild FastWrappers_TSQL.sqlproj /p:Configuration=Release /p:Platform="Any CPU" /t:Build,Package
+        run: msbuild FastWrappers_TSQL.sqlproj /p:Configuration=Release /p:Platform="Any CPU" /t:Build
       
       - name: Verify Build Artifacts
         shell: powershell
@@ -35,8 +35,8 @@ jobs:
             Write-Host "bin folder does not exist!"
           }
           
-          # Check for DACPAC
-          $dacpacPath = "bin\Release\FastWrappers_TSQL.dacpac"
+          # Check for DACPAC in bin\Output (SQL Projects output here)
+          $dacpacPath = "bin\Output\FastWrappers_TSQL.dacpac"
           if (Test-Path $dacpacPath) {
             Write-Host "✓ DACPAC found at: $dacpacPath"
           } else {
@@ -62,15 +62,16 @@ jobs:
           # Variables
           $serverInstance = "(localdb)\MSSQLLocalDB"
           $dbName = "FastWrappers-TSQL"
-          $dacpacPath = "bin\Release\FastWrappers_TSQL.dacpac"
-          $bacpacPath = "bin\Release\FastWrappers-TSQL.bacpac"
-          $bakPath = "bin\Release\FastWrappers-TSQL.bak"
-          $generatedSqlPath = "bin\Release\FastWrappers-TSQL.sql"
+          $dacpacPath = "bin\Output\FastWrappers_TSQL.dacpac"
+          $outputDir = "bin\Release"
+          $bacpacPath = "$outputDir\FastWrappers-TSQL.bacpac"
+          $bakPath = "$outputDir\FastWrappers-TSQL.bak"
+          $generatedSqlPath = "$outputDir\FastWrappers-TSQL.sql"
           
           # Ensure output directory exists
-          if (!(Test-Path "bin\Release")) {
-              Write-Host "Creating bin\Release directory..."
-              New-Item -Path "bin\Release" -ItemType Directory -Force | Out-Null
+          if (!(Test-Path $outputDir)) {
+              Write-Host "Creating $outputDir directory..."
+              New-Item -Path $outputDir -ItemType Directory -Force | Out-Null
           }
           
           # Verify DACPAC exists
@@ -128,11 +129,11 @@ jobs:
           
           # Copy DACPAC with proper name
           Write-Host "Copying DACPAC with release name..."
-          Copy-Item $dacpacPath "bin\Release\FastWrappers-TSQL.dacpac" -Force
+          Copy-Item $dacpacPath "$outputDir\FastWrappers-TSQL.dacpac" -Force
           
           # List all created artifacts
           Write-Host "`nCreated artifacts:"
-          Get-ChildItem -Path "bin\Release" -File | Format-Table Name, Length
+          Get-ChildItem -Path $outputDir -File | Format-Table Name, Length
           
           Write-Host "All artifacts processing completed!"
       
