@@ -110,10 +110,10 @@ jobs:
               Write-Warning "Failed to create BACPAC, continuing..."
           }
           
-          # Create .bak file with compatibility level for SQL Server 2016 (without compression for Express)
-          Write-Host "Creating SQL Server 2016 compatible backup..."
+          # Create backup file
+          Write-Host "Creating SQL Server backup..."
           $bakFullPath = Join-Path $PWD $bakPath
-          sqlcmd -S $serverInstance -Q "ALTER DATABASE [$dbName] SET COMPATIBILITY_LEVEL = 130; BACKUP DATABASE [$dbName] TO DISK = N'$bakFullPath' WITH STATS = 10"
+          sqlcmd -S $serverInstance -Q "BACKUP DATABASE [$dbName] TO DISK = N'$bakFullPath' WITH STATS = 10"
           
           if ($LASTEXITCODE -ne 0) {
               Write-Warning "Failed to create BAK file, continuing..."
@@ -176,38 +176,37 @@ jobs:
           body: |
             ## FastWrappers-TSQL v${{ steps.get_version.outputs.VERSION }}
             
-            ### Installation Methods
+            ### Installation Files
             
-            This release provides multiple installation options:
-            
-            - **FastWrappers-TSQL.dacpac** - Data-tier Application Package (recommended for Visual Studio / SQL Server Data Tools)
+            - **FastWrappers-TSQL.dacpac** - Data-tier Application Package (for Visual Studio / SQL Server Data Tools)
             - **FastWrappers-TSQL.bacpac** - Binary Application Package (for import/export between servers)
-            - **FastWrappers-TSQL.bak** - SQL Server Backup (compatible with SQL Server 2016+, restore using SSMS)
-            - **FastWrappers-TSQL.sql** - Pure SQL Script (execute using sqlcmd or SSMS)
+            - **FastWrappers-TSQL.bak** - SQL Server Backup (restore using SSMS)
+            - **FastWrappers-TSQL.sql** - SQL Script (execute using sqlcmd or SSMS)
             
-            ### Prerequisites
+            ### Installation
             
-            After deployment, you must enable CLR and set TRUSTWORTHY:
-            
+            **Option 1: Restore from backup (.bak file)**
             ```sql
-            USE [FastWrappers-TSQL];
+            RESTORE DATABASE [FastWrappers-TSQL] FROM DISK = 'FastWrappers-TSQL.bak';
             GO
             
+            -- Enable TRUSTWORTHY and CLR
             ALTER DATABASE [FastWrappers-TSQL] SET TRUSTWORTHY ON;
             GO
             
             EXEC sp_configure 'show advanced options', 1;
             RECONFIGURE;
-            GO
-            
             EXEC sp_configure 'clr enabled', 1;
             RECONFIGURE;
             GO
             ```
             
+            **Option 2: Deploy DACPAC**
+            Use SqlPackage or Visual Studio to deploy the .dacpac file.
+            
             ### Usage
             
-            See [README.md](https://github.com/${{ github.repository }}/blob/main/README.md) for usage examples.
+            See [README.md](https://github.com/${{ github.repository }}/blob/main/README.md) for examples.
           files: |
             release/*
           draft: false
