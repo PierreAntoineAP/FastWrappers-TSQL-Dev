@@ -608,28 +608,22 @@ namespace FastWrapper
 
 		// License (optional)
 		if (!string.IsNullOrEmpty(licenseVal))
-				args += $" --license {Q(licenseVal)}";
-			}
+	{
+		args += $" --license {Q(licenseVal)}";
+	}
 
-			// Loglevel
-			if (!string.IsNullOrEmpty(loglevelVal))
-			{
-				args += $" --loglevel {Q(loglevelVal)}";
-			}
-			if (noBannerVal)
-			{
-				args += " --nobanner";
-			}
+	// Loglevel
+	if (!string.IsNullOrEmpty(loglevelVal))
+	{
+		args += $" --loglevel {Q(loglevelVal)}";
+	}
+	if (noBannerVal)
+	{
+		args += " --nobanner";
+	}
 
-			// Trim leading space
-			args = args.Trim();
-
-			//args4Log : for logging purpose, remove password or passwd info in the args string using regexp
-			string args4Log = args;
-			args4Log = System.Text.RegularExpressions.Regex.Replace(args4Log, @"--sourcepassword\s+""[^""]*""", "--sourcepassword \"<hidden>\"");
-			args4Log = System.Text.RegularExpressions.Regex.Replace(args4Log, @"--targetpassword\s+""[^""]*""", "--targetpassword \"<hidden>\"");
-			args4Log = System.Text.RegularExpressions.Regex.Replace(args4Log, @"--sourceconnectstring\s+""[^""]*""", "--sourceconnectstring \"<hidden>\"");
-			args4Log = System.Text.RegularExpressions.Regex.Replace(args4Log, @"--targetconnectstring\s+""[^""]*""", "--targetconnectstring \"<hidden>\"");
+	// Trim leading space
+	args = args.Trim();
 
 
 			if (debugVal)
