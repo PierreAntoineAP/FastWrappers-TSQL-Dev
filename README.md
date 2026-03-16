@@ -40,20 +40,7 @@ GO
 
 **Important:** The `sp_changedbowner 'sa'` command is **critical** for signed UNSAFE CLR assemblies to work. Without it, you will encounter error 0x80FC80F1 when trying to execute the stored procedures.
 
-## Creating a New Release
-
-To create a new release:
-
-1. Update the version number in [Properties/AssemblyInfo.cs](Properties/AssemblyInfo.cs)
-2. Commit your changes
-3. Create and push a new tag:
-   ```bash
-   git tag v0.3.3
-   git push origin v0.3.3
-   ```
-4. The GitHub Actions workflow will automatically build and create a release with all installation artifacts
-
-Samples usage :
+## Usage Examples
 
 ### Copy one table using 12 threads between two MSSQL instances 
 ```TSQL
