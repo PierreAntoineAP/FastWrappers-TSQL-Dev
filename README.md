@@ -133,6 +133,55 @@ Wraps the **FastBCP** CLI to export data from databases to files with streaming 
 - Timestamped output files
 - YAML configuration file support
 
+## Logging and Output
+
+### FastTransfer Output
+
+By default, **xp_RunFastTransfer_secure** returns a structured result set with transfer metrics:
+
+| Column | Type | Description |
+|--------|------|-------------|
+| targetdatabase | nvarchar(128) | Target database name |
+| targetSchema | nvarchar(128) | Target schema name |
+| targetTable | nvarchar(128) | Target table name |
+| TotalRows | bigint | Number of rows transferred |
+| TotalColumns | int | Number of columns transferred |
+| TotalCells | bigint | Total cells transferred (rows × columns) |
+| TotalTimeMs | bigint | Total execution time in milliseconds |
+| Status | int | Exit code (0 = success, non-zero = error) |
+| StdErr | nvarchar(max) | Error message if Status ≠ 0 |
+
+**Example output:**
+```
+targetdatabase  targetSchema  targetTable  TotalRows  TotalColumns  TotalCells   TotalTimeMs  Status  StdErr
+postgres        public        orders       15000000   9             135000000    27502        0       
+```
+
+#### Debug Mode (@debug = 1)
+
+When you set `@debug = 1`, the stored procedure will also output:
+
+1. **The complete command line** being executed (in the Messages tab):
+   ```
+   FastTransfer Command .\FastTransfer.exe --sourceconnectiontype "mssql" --sourceserver "localhost" ...
+   ```
+   *(Passwords and connection strings are automatically masked with `<hidden>` for security)*
+
+2. **The full console output (stdout)** from FastTransfer (in the Messages tab):
+   - Real-time progress updates
+   - Detailed execution logs
+   - Performance metrics
+   - Any warnings or informational messages
+
+**Example with debug:**
+```sql
+EXEC dbo.xp_RunFastTransfer_secure
+    @fastTransferDir = 'C:\FastTransfer\latest',
+    @sourceConnectionType = 'mssql',
+    -- ... other parameters ...
+    @debug = 1  -- Enable verbose logging
+```
+
 ## Usage Examples
 
 ### Copy one table using 12 threads between two MSSQL instances 
