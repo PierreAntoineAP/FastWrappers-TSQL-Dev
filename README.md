@@ -16,19 +16,65 @@ Download the latest release from the [Releases page](https://github.com/aetperf/
 
 ### Post-Installation Configuration
 
-After restoring the database (especially from .bak), you **must** run the following commands to enable CLR and configure the database properly:
+After restoring the database (especially from .bak), you **must** configure CLR integration. Two options are available depending on your environment:
+
+#### Option 1: Using sp_add_trusted_assembly (Recommended for Production) 🔒
+
+This approach is **more secure** as it keeps TRUSTWORTHY OFF and doesn't require changing the database owner:
+
+```sql
+-- Enable CLR integration
+EXEC sp_configure 'show advanced options', 1;
+RECONFIGURE;
+GO
+
+EXEC sp_configure 'clr enabled', 1;
+RECONFIGURE;
+GO
+
+-- Extract the assembly hash and add it to trusted assemblies
+DECLARE @hash VARBINARY(64);
+
+SELECT @hash = HASHBYTES('SHA2_512', content)
+FROM sys.assembly_files
+WHERE assembly_id = (
+    SELECT assembly_id 
+    FROM sys.assemblies 
+    WHERE name = 'FastWrappers_TSQL'
+);
+
+EXEC sys.sp_add_trusted_assembly 
+    @hash = @hash,
+    @description = N'FastWrappers_TSQL Assembly v0.7.0';
+GO
+```
+
+**Advantages:**
+- ✅ TRUSTWORTHY remains OFF (more secure)
+- ✅ No need to change database owner
+- ✅ Only this specific assembly is trusted
+
+**Note:** The assembly hash changes with each version. When upgrading, you must remove the old hash and add the new one:
+```sql
+-- Remove old version
+EXEC sys.sp_drop_trusted_assembly @hash = <old_hash>;
+-- Then run the sp_add_trusted_assembly script above
+```
+
+#### Option 2: Using TRUSTWORTHY ON (Quick Setup for Dev/Test)
+
+This approach is simpler but **less secure**. Use only for development/testing environments:
 
 ```sql
 -- Enable TRUSTWORTHY for signed UNSAFE assemblies
 ALTER DATABASE [FastWrappers-TSQL] SET TRUSTWORTHY ON;
 GO
 
--- Enable advanced options
+-- Enable CLR integration
 EXEC sp_configure 'show advanced options', 1;
 RECONFIGURE;
 GO
 
--- Enable CLR integration
 EXEC sp_configure 'clr enabled', 1;
 RECONFIGURE;
 GO
@@ -38,7 +84,7 @@ EXEC sp_changedbowner 'sa';
 GO
 ```
 
-**Important:** The `sp_changedbowner 'sa'` command is **critical** for signed UNSAFE CLR assemblies to work. Without it, you will encounter error 0x80FC80F1 when trying to execute the stored procedures.
+**Important:** With this method, the `sp_changedbowner 'sa'` command is **critical**. Without it, you will encounter error 0x80FC80F1 when trying to execute the stored procedures.
 
 ## Usage Examples
 
