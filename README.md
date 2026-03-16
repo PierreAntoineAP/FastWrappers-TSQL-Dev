@@ -18,7 +18,7 @@ Download the latest release from the [Releases page](https://github.com/aetperf/
 
 After restoring the database (especially from .bak), you **must** configure CLR integration. Two options are available depending on your environment:
 
-#### Option 1: Using sp_add_trusted_assembly (Recommended for Production) 🔒
+#### Option 1: Using sp_add_trusted_assembly (Recommended for Production) 
 
 This approach is **more secure** as it keeps TRUSTWORTHY OFF and doesn't require changing the database owner:
 
@@ -85,6 +85,53 @@ GO
 ```
 
 **Important:** With this method, the `sp_changedbowner 'sa'` command is **critical**. Without it, you will encounter error 0x80FC80F1 when trying to execute the stored procedures.
+
+## Available Stored Procedures
+
+Once installed and configured, the FastWrappers-TSQL assembly provides the following stored procedures:
+
+### 1. **dbo.EncryptString** - Password Encryption Function
+```sql
+SELECT dbo.EncryptString('YourPassword')
+```
+Encrypts passwords using AES-256 encryption. Use this function to generate encrypted passwords for the `@sourcePasswordSecure` and `@targetPasswordSecure` parameters.
+
+**Returns:** Base64-encoded encrypted string
+
+### 2. **dbo.xp_RunFastTransfer_secure** - Data Transfer Wrapper
+```sql
+EXEC dbo.xp_RunFastTransfer_secure @fastTransferDir = '...', ...
+```
+Wraps the **FastTransfer** CLI to transfer data between databases with streaming and parallel processing for high performance.
+
+**Key Features:**
+- Supports 13 source connection types (ClickHouse, DuckDB, HANA, SQL Server, MySQL, Netezza, Oracle, PostgreSQL, Teradata, ODBC, OLEDB)
+- Supports 10 target connection types with bulk loading (clickhousebulk, duckdb, hanabulk, msbulk, mysqlbulk, nzbulk, orabulk, oradirect, pgcopy, teradata)
+- Parallel methods: None, Random, DataDriven, RangeId, Ntile, Ctid (PostgreSQL), Physloc (SQL Server), Rowid (Oracle), NZDataSlice (Netezza)
+- Automatic column mapping by position or name
+- Encrypted connection strings and passwords using AES-256
+- Configurable batch sizes and parallelism degree
+- Load modes: Append, Truncate
+- Work tables support for staging data
+- Custom data-driven distribution queries
+
+### 3. **dbo.xp_RunFastBCP_secure** - Data Export Wrapper
+```sql
+EXEC dbo.xp_RunFastBCP_secure @fastBCPDir = '...', ...
+```
+Wraps the **FastBCP** CLI to export data from databases to files with streaming and parallel processing for high performance.
+
+**Key Features:**
+- Supports 11 connection types (ClickHouse, HANA, SQL Server, MySQL, Netezza, ODBC, OLEDB, Oracle, PostgreSQL, Teradata)
+- Multiple output formats: CSV, TSV, JSON, Parquet, BSON, Binary (PostgreSQL COPY), XLSX (Excel)
+- Parquet compression codecs: Zstd (default), Snappy, Gzip, Lzo, Lz4, None
+- Parallel methods: None, Random, DataDriven, RangeId, Ntile, Timepartition, Ctid (PostgreSQL), Physloc (SQL Server), Rowid (Oracle)
+- Cloud storage support: AWS S3, Azure Blob Storage, Azure Data Lake Gen2, Google Cloud Storage, S3-Compatible, OneLake
+- Configurable CSV/TSV formatting (delimiter, quotes, date format, decimal separator, boolean format, encoding)
+- Encrypted connection strings and passwords using AES-256
+- File merge option for parallel exports
+- Timestamped output files
+- YAML configuration file support
 
 ## Usage Examples
 
