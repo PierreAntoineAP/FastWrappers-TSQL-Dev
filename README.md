@@ -14,6 +14,32 @@ Download the latest release from the [Releases page](https://github.com/aetperf/
 3. **FastWrappers-TSQL.bak** - SQL Server Backup file (compatible with SQL Server 2016+, restore using SSMS)
 4. **FastWrappers-TSQL.sql** - Pure SQL Script (execute using sqlcmd or SSMS)
 
+### Post-Installation Configuration
+
+After restoring the database (especially from .bak), you **must** run the following commands to enable CLR and configure the database properly:
+
+```sql
+-- Enable TRUSTWORTHY for signed UNSAFE assemblies
+ALTER DATABASE [FastWrappers-TSQL] SET TRUSTWORTHY ON;
+GO
+
+-- Enable advanced options
+EXEC sp_configure 'show advanced options', 1;
+RECONFIGURE;
+GO
+
+-- Enable CLR integration
+EXEC sp_configure 'clr enabled', 1;
+RECONFIGURE;
+GO
+
+-- Set database owner to 'sa' (required for signed UNSAFE assemblies)
+EXEC sp_changedbowner 'sa';
+GO
+```
+
+**Important:** The `sp_changedbowner 'sa'` command is **critical** for signed UNSAFE CLR assemblies to work. Without it, you will encounter error 0x80FC80F1 when trying to execute the stored procedures.
+
 ## Creating a New Release
 
 To create a new release:
