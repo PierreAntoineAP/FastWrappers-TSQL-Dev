@@ -86,6 +86,54 @@ GO
 
 **Important:** With this method, the `sp_changedbowner 'sa'` command is **critical**. Without it, you will encounter error 0x80FC80F1 when trying to execute the stored procedures.
 
+## Security Roles
+
+The FastWrappers-TSQL database includes two predefined database roles to manage access to the stored procedures:
+
+### 1. **FastTransfer_Executor**
+
+This role grants `EXECUTE` permission on the **xp_RunFastTransfer_secure** stored procedure.
+
+**Usage:**
+```sql
+-- Add a user to the FastTransfer_Executor role
+ALTER ROLE [FastTransfer_Executor] ADD MEMBER [YourUserName];
+GO
+```
+
+**Purpose:** Allows users to perform data transfers between databases without granting them broader permissions.
+
+### 2. **FastBCP_Executor**
+
+This role grants `EXECUTE` permission on the **xp_RunFastBCP_secure** stored procedure.
+
+**Usage:**
+```sql
+-- Add a user to the FastBCP_Executor role
+ALTER ROLE [FastBCP_Executor] ADD MEMBER [YourUserName];
+GO
+```
+
+**Purpose:** Allows users to export data to files without granting them broader permissions.
+
+### Combined Access
+
+To grant a user access to both FastTransfer and FastBCP:
+
+```sql
+-- Add user to both roles
+ALTER ROLE [FastTransfer_Executor] ADD MEMBER [YourUserName];
+ALTER ROLE [FastBCP_Executor] ADD MEMBER [YourUserName];
+GO
+```
+
+**Note:** Users also need access to the **dbo.EncryptString** function to generate encrypted passwords. Consider granting `EXECUTE` permission explicitly if needed:
+
+```sql
+GRANT EXECUTE ON dbo.EncryptString TO [YourUserName];
+GO
+```
+
 ## Available Stored Procedures
 
 Once installed and configured, the FastWrappers-TSQL assembly provides the following stored procedures:
