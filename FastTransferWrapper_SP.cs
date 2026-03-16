@@ -625,15 +625,18 @@ namespace FastWrapper
 	// Trim leading space
 	args = args.Trim();
 
+	//args4Log : for logging purpose, remove password or passwd info in the args string using regexp
+	string args4Log = args;
+	args4Log = System.Text.RegularExpressions.Regex.Replace(args4Log, @"--sourcepassword\s+""[^""]*""", "--sourcepassword \"<hidden>\"");
+	args4Log = System.Text.RegularExpressions.Regex.Replace(args4Log, @"--targetpassword\s+""[^""]*""", "--targetpassword \"<hidden>\"");
+	args4Log = System.Text.RegularExpressions.Regex.Replace(args4Log, @"--sourceconnectstring\s+""[^""]*""", "--sourceconnectstring \"<hidden>\"");
+	args4Log = System.Text.RegularExpressions.Regex.Replace(args4Log, @"--targetconnectstring\s+""[^""]*""", "--targetconnectstring \"<hidden>\"");
 
-			if (debugVal)
-			{			
-				//print the command line exe and args
-				SqlContext.Pipe.Send("FastTransfer Command " + exePath + " " + args4Log + Environment.NewLine);				
-			}
-
-			// --------------------------------------------------------------------
-			// 4. Execute the CLI
+	if (debugVal)
+	{			
+		//print the command line exe and args
+		SqlContext.Pipe.Send("FastTransfer Command " + exePath + " " + args4Log + Environment.NewLine);				
+	}
 			// --------------------------------------------------------------------
 			ProcessStartInfo psi = new ProcessStartInfo
 			{
