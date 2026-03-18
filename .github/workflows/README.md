@@ -4,7 +4,7 @@ This GitHub Actions workflow automates the creation of releases for the FastWrap
 
 ## Trigger
 
-The workflow is automatically triggered when creating a new tag starting with `v` (e.g., `v0.3.3`).
+The workflow is automatically triggered when creating a new tag starting with `v` (e.g., `vx.y.z`).
 
 ## Generated Artifacts
 
@@ -46,23 +46,23 @@ The workflow generates 4 types of artifacts for different installation methods:
 
 Edit [Properties/AssemblyInfo.cs](../Properties/AssemblyInfo.cs):
 ```csharp
-[assembly: AssemblyVersion("0.3.3.0")]
-[assembly: AssemblyFileVersion("0.3.3.0")]
+[assembly: AssemblyVersion("x.y.z.0")]
+[assembly: AssemblyFileVersion("x.y.z.0")]
 ```
 
 Optional: Update [FastWrappers_TSQL.sqlproj](../FastWrappers_TSQL.sqlproj):
 ```xml
-<DacVersion>0.3.3.0</DacVersion>
+<DacVersion>x.y.z.0</DacVersion>
 ```
 
 ### 2. Commit and Tag
 
 ```bash
 git add Properties/AssemblyInfo.cs
-git commit -m "Bump version to 0.3.3"
-git tag v0.3.3
+git commit -m "Bump version to x.y.z"
+git tag vx.y.z
 git push origin main
-git push origin v0.3.3
+git push origin vx.y.z
 ```
 
 ### 3. Verify the Release
