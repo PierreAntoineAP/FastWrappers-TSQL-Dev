@@ -139,12 +139,38 @@ jobs:
               Write-Warning "Failed to create BAK file, continuing..."
           }
           
-          # Generate SQL script from DACPAC (includes the compiled binary)
-          Write-Host "Generating SQL script from DACPAC..."
-          & $sqlPackage /Action:Script /SourceFile:$dacpacPath /TargetServerName:$serverInstance /TargetDatabaseName:"${dbName}_Script" /OutputPath:$generatedSqlPath /p:IncludeCompositeObjects=True /p:CommentOutSetVarDeclarations=True
+          # Generate SQL script with current assembly binary
+          Write-Host "Generating SQL script with assembly binary..."
           
-          if ($LASTEXITCODE -ne 0) {
-              Write-Warning "Failed to generate SQL script, continuing..."
+          # Extract assembly binary from deployed database using SqlClient (no size limitations)
+          $connectionString = "Server=$serverInstance;Database=$dbName;Integrated Security=True;TrustServerCertificate=True;"
+          $connection = New-Object System.Data.SqlClient.SqlConnection($connectionString)
+          $connection.Open()
+          
+          $command = $connection.CreateCommand()
+          $command.CommandText = "SELECT content FROM sys.assembly_files WHERE assembly_id = (SELECT assembly_id FROM sys.assemblies WHERE name = 'FastWrappers_TSQL')"
+          
+          $reader = $command.ExecuteReader()
+          $assemblyHex = $null
+          
+          if ($reader.Read()) {
+              $bytes = $reader.GetSqlBytes(0).Value
+              $hexString = [System.BitConverter]::ToString($bytes) -replace '-',''
+              $assemblyHex = "0x$hexString"
+              Write-Host "Assembly binary extracted (length: $($assemblyHex.Length) chars, $($bytes.Length) bytes)"
+          }
+          
+          $reader.Close()
+          $connection.Close()
+          
+          if ($assemblyHex) {
+              # Read template and inject assembly binary
+              $sqlTemplate = Get-Content "FastWrappers-TSQL.sql" -Raw
+              $finalSql = $sqlTemplate -replace '__ASSEMBLY_FROM_0X__', $assemblyHex
+              $finalSql | Out-File -FilePath $generatedSqlPath -Encoding UTF8
+              Write-Host "SQL script generated successfully"
+          } else {
+              Write-Warning "Failed to extract assembly binary"
           }
           
           # Copy DACPAC with proper name
