@@ -9,10 +9,52 @@ As a reminder :
 
 Download the latest release from the [Releases page](https://github.com/aetperf/FastWrappers-TSQL/releases). Each release provides 4 installation options:
 
-1. **FastWrappers-TSQL.dacpac** - Data-tier Application Package (recommended for Visual Studio / SQL Server Data Tools)
-2. **FastWrappers-TSQL.bacpac** - Binary Application Package (for import/export between servers)
-3. **FastWrappers-TSQL.bak** - SQL Server Backup file (compatible with SQL Server 2016+, restore using SSMS)
-4. **FastWrappers-TSQL.sql** - Pure SQL Script (execute using sqlcmd or SSMS)
+### Recommended Installation Methods
+
+#### 1. **FastWrappers-TSQL.bak** (Recommended) 
+SQL Server Backup file - **Requires SQL Server 2019 or higher**
+
+✅ **Fastest installation method**  
+✅ **Pre-configured database with all objects**
+
+⚠️ **Post-installation configuration required:**
+- Enable CLR integration (`sp_configure 'clr enabled', 1`)
+- Trust the assembly using `sp_add_trusted_assembly` (see [Post-Installation Configuration](#post-installation-configuration))
+
+**Installation:**
+```sql
+-- Restore the database
+RESTORE DATABASE [FastWrappers-TSQL] 
+FROM DISK = 'C:\path\to\FastWrappers-TSQL.bak' 
+WITH MOVE 'FastWrappers-TSQL' TO 'C:\path\to\FastWrappers-TSQL.mdf',
+     MOVE 'FastWrappers-TSQL_log' TO 'C:\path\to\FastWrappers-TSQL_log.ldf';
+GO
+```
+
+#### 2. **FastWrappers-TSQL.sql** (Alternative for older SQL Server versions)
+Self-contained SQL script - **Compatible with SQL Server 2016 or higher**
+
+✅ **Complete installation in a single script**  
+✅ **Includes database creation, CLR activation, trusted assembly configuration, and all objects**  
+✅ **No post-installation configuration needed**
+
+**Installation:**
+```sql
+-- Simply execute the script in SSMS or using sqlcmd
+sqlcmd -S YourServer -i FastWrappers-TSQL.sql
+```
+
+**What's included:**
+- Database creation with proper settings
+- CLR integration enabled
+- Assembly registration with `sp_add_trusted_assembly` (secure method)
+- All stored procedures and functions
+- Security roles (FastTransfer_Executor, FastBCP_Executor)
+
+### Additional Options
+
+3. **FastWrappers-TSQL.dacpac** - Data-tier Application Package (for Visual Studio / SQL Server Data Tools)
+4. **FastWrappers-TSQL.bacpac** - Binary Application Package (for import/export between servers)
 
 ### Post-Installation Configuration
 
