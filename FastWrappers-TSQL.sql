@@ -188,7 +188,7 @@ CREATE PROCEDURE [dbo].[xp_RunFastBCP_secure]
 	@method [nvarchar](50) = N'None',
 	@distributeKeyColumn [nvarchar](255) = N'',
 	@datadrivenquery [nvarchar](4000) = N'',
-	@mergeDistributedFile [bit] = 1,
+	@mergeDistributedFile [bit] = 0,
 	@timestamped [bit] = 0,
 	@noheader [bit] = 0,
 	@boolformat [nvarchar](50) = N'automatic',
