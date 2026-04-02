@@ -238,7 +238,12 @@ namespace FastWrapper
 			if (!string.IsNullOrEmpty(applicationintentVal) && 
 				(connType == "mssql" || connType == "oledb" || connType == "msoledbsql"))
 			{
-				args.Append(" --applicationintent ").Append(applicationintentVal);
+				string normalizedApplicationIntent = applicationintentVal.Trim();
+				if (string.Equals(normalizedApplicationIntent, "ReadOnly", StringComparison.OrdinalIgnoreCase) ||
+				    string.Equals(normalizedApplicationIntent, "ReadWrite", StringComparison.OrdinalIgnoreCase))
+				{
+					args.Append(" --applicationintent ").Append(Q(normalizedApplicationIntent));
+				}
 			}
 
 			// decimal separator
