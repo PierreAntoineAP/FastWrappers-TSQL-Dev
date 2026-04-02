@@ -49,8 +49,16 @@ jobs:
       - name: Setup SQL Server (LocalDB)
         shell: powershell
         run: |
-          # Start SQL LocalDB
-          sqllocaldb create MSSQLLocalDB
+          # Ensure SQL LocalDB instance exists
+          sqllocaldb info MSSQLLocalDB > $null 2>&1
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host "MSSQLLocalDB instance not found. Creating..."
+            sqllocaldb create MSSQLLocalDB
+          } else {
+            Write-Host "MSSQLLocalDB instance already exists."
+          }
+
+          # Ensure SQL LocalDB is started
           sqllocaldb start MSSQLLocalDB
           
           # Wait for SQL Server to be ready
