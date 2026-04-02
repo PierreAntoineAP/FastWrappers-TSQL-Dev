@@ -7,9 +7,9 @@ As a reminder :
 
 ## Installation
 
-Download the latest release from the [Releases page](https://github.com/aetperf/FastWrappers-TSQL/releases). Each release provides 4 installation options:
+Download the latest release from the [Releases page](https://github.com/aetperf/FastWrappers-TSQL/releases). Each release provides 2 installation options:
 
-### Recommended Installation Methods
+### Installation Methods
 
 #### 1. **FastWrappers-TSQL.bak** (Recommended) 
 SQL Server Backup file - **Requires SQL Server 2019 or higher**
@@ -50,11 +50,6 @@ sqlcmd -S YourServer -i FastWrappers-TSQL.sql
 - Assembly registration with `sp_add_trusted_assembly` (secure method)
 - All stored procedures and functions
 - Security roles (FastTransfer_Executor, FastBCP_Executor)
-
-### Additional Options
-
-3. **FastWrappers-TSQL.dacpac** - Data-tier Application Package (for Visual Studio / SQL Server Data Tools)
-4. **FastWrappers-TSQL.bacpac** - Binary Application Package (for import/export between servers)
 
 ### Post-Installation Configuration
 
