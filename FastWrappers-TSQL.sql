@@ -27,11 +27,21 @@ GO
 USE [master]
 GO
 
+DECLARE @AllowDatabaseDrop BIT = 0; -- Set to 1 to allow dropping existing FastWrappers-TSQL database
+
 IF EXISTS (SELECT name FROM sys.databases WHERE name = 'FastWrappers-TSQL')
 BEGIN
-    PRINT 'Database FastWrappers-TSQL already exists. Dropping it...';
-    ALTER DATABASE [FastWrappers-TSQL] SET SINGLE_USER WITH ROLLBACK IMMEDIATE;
-    DROP DATABASE [FastWrappers-TSQL];
+    IF @AllowDatabaseDrop = 1
+    BEGIN
+        PRINT 'Database FastWrappers-TSQL already exists. Dropping it because @AllowDatabaseDrop = 1...';
+        ALTER DATABASE [FastWrappers-TSQL] SET SINGLE_USER WITH ROLLBACK IMMEDIATE;
+        DROP DATABASE [FastWrappers-TSQL];
+    END
+    ELSE
+    BEGIN
+        PRINT 'Database FastWrappers-TSQL already exists. Skipping DROP because @AllowDatabaseDrop = 0.';
+        PRINT 'If you want to recreate the database from scratch, set @AllowDatabaseDrop = 1 and re-run this script.';
+    END
 END
 GO
 
