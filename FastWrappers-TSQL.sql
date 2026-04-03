@@ -36,25 +36,25 @@ BEGIN
         PRINT 'Database FastWrappers-TSQL already exists. Dropping it because @AllowDatabaseDrop = 1...';
         ALTER DATABASE [FastWrappers-TSQL] SET SINGLE_USER WITH ROLLBACK IMMEDIATE;
         DROP DATABASE [FastWrappers-TSQL];
+        PRINT 'Database FastWrappers-TSQL dropped successfully.';
     END
     ELSE
     BEGIN
-        PRINT 'Database FastWrappers-TSQL already exists. Skipping DROP because @AllowDatabaseDrop = 0.';
-        PRINT 'If you want to recreate the database from scratch, set @AllowDatabaseDrop = 1 and re-run this script.';
+        PRINT 'Database FastWrappers-TSQL already exists. Skipping creation because @AllowDatabaseDrop = 0.';
+        PRINT 'Existing database will be used. Objects will be recreated/updated.';
     END
 END
 GO
 
-CREATE DATABASE [FastWrappers-TSQL]
-GO
-
-ALTER DATABASE [FastWrappers-TSQL] SET RECOVERY SIMPLE;
-GO
-
-ALTER DATABASE [FastWrappers-TSQL] SET PAGE_VERIFY CHECKSUM;
-GO
-
-PRINT 'Database FastWrappers-TSQL created successfully.';
+IF NOT EXISTS (SELECT name FROM sys.databases WHERE name = 'FastWrappers-TSQL')
+BEGIN
+    CREATE DATABASE [FastWrappers-TSQL]
+    
+    ALTER DATABASE [FastWrappers-TSQL] SET RECOVERY SIMPLE;
+    ALTER DATABASE [FastWrappers-TSQL] SET PAGE_VERIFY CHECKSUM;
+    
+    PRINT 'Database FastWrappers-TSQL created successfully.';
+END
 GO
 
 -- =====================================================================
@@ -66,10 +66,37 @@ GO
 USE [FastWrappers-TSQL];
 GO
 
+-- Drop existing assembly if it exists
+IF EXISTS (SELECT * FROM sys.assemblies WHERE name = 'FastWrappers_TSQL')
+BEGIN
+    -- Drop dependent objects first
+    IF EXISTS (SELECT * FROM sys.objects WHERE name = 'xp_RunFastBCP_secure' AND type = 'PC')
+        DROP PROCEDURE [dbo].[xp_RunFastBCP_secure];
+    
+    IF EXISTS (SELECT * FROM sys.objects WHERE name = 'xp_RunFastTransfer_secure' AND type = 'PC')
+        DROP PROCEDURE [dbo].[xp_RunFastTransfer_secure];
+    
+    IF EXISTS (SELECT * FROM sys.objects WHERE name = 'EncryptString' AND type IN ('FN', 'TF', 'IF', 'FS'))
+        DROP FUNCTION [dbo].[EncryptString];
+    
+    -- Now drop the assembly
+    DROP ASSEMBLY [FastWrappers_TSQL];
+    PRINT 'Existing assembly [FastWrappers_TSQL] dropped.';
+END
+GO
+
 -- Add assembly to trusted list BEFORE creating it
 DECLARE @assemblyBinary VARBINARY(MAX) = __ASSEMBLY_FROM_0X__;
 DECLARE @hash VARBINARY(64) = HASHBYTES('SHA2_512', @assemblyBinary);
 
+-- Remove from trusted list if already exists
+IF EXISTS (SELECT * FROM sys.trusted_assemblies WHERE [hash] = @hash)
+BEGIN
+    EXEC sys.sp_drop_trusted_assembly @hash = @hash;
+    PRINT 'Existing trusted assembly hash removed.';
+END
+
+-- Add to trusted list
 EXEC sys.sp_add_trusted_assembly 
     @hash = @hash,
     @description = N'FastWrappers_TSQL Assembly';
