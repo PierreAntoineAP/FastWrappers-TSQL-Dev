@@ -82,7 +82,7 @@ WHERE assembly_id = (
 
 EXEC sys.sp_add_trusted_assembly 
     @hash = @hash,
-    @description = N'FastWrappers_TSQL Assembly v0.7.0';
+    @description = N'FastWrappers_TSQL Assembly v1.1.0';
 GO
 ```
 
@@ -190,9 +190,10 @@ EXEC dbo.xp_RunFastTransfer_secure @fastTransferDir = '...', ...
 Wraps the **FastTransfer** CLI to transfer data between databases with streaming and parallel processing for high performance.
 
 **Key Features:**
-- Supports 13 source connection types (ClickHouse, DuckDB, HANA, SQL Server, MySQL, Netezza, Oracle, PostgreSQL, Teradata, ODBC, OLEDB)
+- Supports 16 source connection types (clickhouse, duckdb, duckdbstream, hana, msoledbsql, mssql, mysql, nzbulk, nzoledb, nzsql, odbc, oledb, oraodp, pgcopy, pgsql, teradata)
 - Supports 10 target connection types with bulk loading (clickhousebulk, duckdb, hanabulk, msbulk, mysqlbulk, nzbulk, orabulk, oradirect, pgcopy, teradata)
-- Parallel methods: None, Random, DataDriven, RangeId, Ntile, Ctid (PostgreSQL), Physloc (SQL Server), Rowid (Oracle), NZDataSlice (Netezza)
+- Parallel methods: None, Random, DataDriven, DBPartition, RangeId, Ntile, Timepartition, Ctid (PostgreSQL), Physloc (SQL Server), Rowid (Oracle), NZDataSlice (Netezza)
+- Timepartition uses `@distributeKeyColumn` like `(datecolumn,year)`, `(datecolumn,year,month)`, `(datecolumn,year,month,day)` or `(datecolumn,year,week)`
 - Automatic column mapping by position or name
 - Encrypted connection strings and passwords using AES-256
 - Configurable batch sizes and parallelism degree
@@ -207,16 +208,17 @@ EXEC dbo.xp_RunFastBCP_secure @fastBCPDir = '...', ...
 Wraps the **FastBCP** CLI to export data from databases to files with streaming and parallel processing for high performance.
 
 **Key Features:**
-- Supports 11 connection types (ClickHouse, HANA, SQL Server, MySQL, Netezza, ODBC, OLEDB, Oracle, PostgreSQL, Teradata)
-- Multiple output formats: CSV, TSV, JSON, Parquet, BSON, Binary (PostgreSQL COPY), XLSX (Excel)
-- Parquet compression codecs: Zstd (default), Snappy, Gzip, Lzo, Lz4, None
-- Parallel methods: None, Random, DataDriven, RangeId, Ntile, Timepartition, Ctid (PostgreSQL), Physloc (SQL Server), Rowid (Oracle)
+- Supports 19 connection types (clickhouse, hana, msoledbsql, mssql, mysql, nzcopy, nzoledb, nzsql, odbc, oledb, oraodp, pgcopy, pgsql, teradata) including the ADBC drivers (adbc_mssql, adbc_pgsql, adbc_oracle, adbc_netezza, adbc_teradata)
+- Multiple output formats: CSV, TSV, JSON, Parquet, BSON, Binary (PostgreSQL COPY), XLSX (Excel), with on-the-fly gzip for csv.gz, tsv.gz and json.gz
+- Parquet compression codecs: Zstd (default), Snappy, Gzip, Lz4, Lz4Raw, None
+- Parallel methods: None, Random, DataDriven, DBPartition, RangeId, Ntile, Timepartition, Physical (Ctid, Physloc, Rowid and NZDataSlice are deprecated in FastBCP and replaced by Physical; they still work with a warning)
 - Cloud storage support: AWS S3, Azure Blob Storage, Azure Data Lake Gen2, Google Cloud Storage, S3-Compatible, OneLake
 - Configurable CSV/TSV formatting (delimiter, quotes, date format, decimal separator, boolean format, encoding)
 - Encrypted connection strings and passwords using AES-256
 - File merge option for parallel exports
 - Timestamped output files
-- YAML configuration file support
+- YAML configuration file support (`@config`)
+- OpenTelemetry trace propagation (`@traceparent`, W3C format `00-<trace-id>-<parent-id>-<flags>`)
 
 ## Logging and Output
 
@@ -394,6 +396,12 @@ EXEC dbo.xp_RunFastBCP_secure
    @mergeDistributedFile = 0
    ```
 
+
+## Compatibility
+
+| FastWrappers-TSQL | FastTransfer | FastBCP |
+|---|---|---|
+| 1.1.0 | 0.18.x | 1.4.x |
 
 ## Nota :
 You must have a valid trial or a valid FastTransfer.exe (or FastTransfer binary for linux) into the directory you specified with @fastTransferDir. The sql server service user must have read/execute provilege on the directory and FastTransfer(.exe) file
