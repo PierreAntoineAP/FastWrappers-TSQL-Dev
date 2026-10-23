@@ -190,7 +190,7 @@ EXEC dbo.xp_RunFastTransfer_secure @fastTransferDir = '...', ...
 Wraps the **FastTransfer** CLI to transfer data between databases with streaming and parallel processing for high performance.
 
 **Key Features:**
-- Supports 16 source connection types (clickhouse, duckdb, duckdbstream, hana, msoledbsql, mssql, mysql, nzbulk, nzoledb, nzsql, odbc, oledb, oraodp, pgcopy, pgsql, teradata)
+- Supports 13 source connection types (clickhouse, duckdb, duckdbstream, hana, mssql, mysql, nzsql, odbc, oledb, oraodp, pgcopy, pgsql, teradata)
 - Supports 10 target connection types with bulk loading (clickhousebulk, duckdb, hanabulk, msbulk, mysqlbulk, nzbulk, orabulk, oradirect, pgcopy, teradata)
 - Parallel methods: None, Random, DataDriven, DBPartition, RangeId, Ntile, Timepartition, Ctid (PostgreSQL), Physloc (SQL Server), Rowid (Oracle), NZDataSlice (Netezza)
 - Timepartition uses `@distributeKeyColumn` like `(datecolumn,year)`, `(datecolumn,year,month)`, `(datecolumn,year,month,day)` or `(datecolumn,year,week)`
